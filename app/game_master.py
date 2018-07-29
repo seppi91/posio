@@ -20,7 +20,7 @@ class GameMaster:
         self.games.append(game)
 
         # Start the game
-        socketio.start_background_task(target=self.run_game, game=game)
+        #socketio.start_background_task(target=self.run_game, game=game)
 
         return game
 
@@ -34,21 +34,17 @@ class GameMaster:
 
     @classmethod
     def run_game(cls, game):
-        while True:
-            # Start a new turn
-            cls.start_turn(game)
+        # Start a new turn
+        cls.start_turn(game)
 
-            # Give the players some time to answer
-            socketio.sleep(game.max_response_time)
+        # Give the players some time to answer
+        socketio.sleep(game.max_response_time)
 
-            # End the turn
-            cls.end_turn(game)
+        # End the turn
+        cls.end_turn(game)
 
-            # Send the new leaderboard to players
-            cls.update_leaderboard(game)
-
-            # Give the user some time between two turns
-            socketio.sleep(game.between_turns_duration)
+        # Send the new leaderboard to players
+        cls.update_leaderboard(game)
 
     @classmethod
     def start_turn(cls, game):
@@ -57,12 +53,12 @@ class GameMaster:
         # Start a new turn
         game.start_new_turn()
 
-        # Get the city for this turn
-        city = game.get_current_city()
+        # Get the question for this turn
+        question = game.get_current_question()
 
-        # Send the infos on the new city to locate to every players in the game
+        # Send the infos on the new question to locate to every players in the game
         socketio.emit('new_turn',
-                      {'city': city['name'], 'country': city['country'], 'country_code': city['country']},
+                      {'question': question['question']},
                       room=game.game_id)
 
     @classmethod
@@ -74,35 +70,46 @@ class GameMaster:
 
         # Rank answers
         ranked_players = game.get_current_turn_ranks()
-        player_count = len(ranked_players)
+        player_count = len(game.players)
 
         # Send the end of turn signal and the correct and best answer to every players in the game
-        city = game.get_current_city()
-        turn_results = {'correct_answer': {'name': city['name'],
-                                           'lat': city['latitude'],
-                                           'lng': city['longitude']}}
+        question = game.get_current_question()
+        turn_results = {'correct_answer': {'question': question['question'],
+                                           'lat': question['latitude'],
+                                           'lng': question['longitude']}}
 
-        if player_count > 0:
+        if len(ranked_players) > 0:
             turn_results['best_answer'] = {
                 'distance': ranked_players[0].get_result(game.turn_number).distance,
                 'lat': ranked_players[0].get_answer(game.turn_number).latitude,
                 'lng': ranked_players[0].get_answer(game.turn_number).longitude
             }
-
-        socketio.emit('end_of_turn', turn_results, room=game.game_id)
+        if player_count > 0:
+            for i in range(2):
+                try:
+                    turn_results["p" + str(i+1)] = game.players[i].get_result(game.turn_number).distance
+                except KeyError:
+                    app.logger.debug("Player %d has no answer" % (i+1))
+                    turn_results["p" + str(i+1)] = "No Answer"
+                except IndexError:
+                    app.logger.debug("Player %d is not in game" % (i+1))
+                    turn_results["p" + str(i+1)] = "Not in Game"
+        socketio.emit('end_of_turn', turn_results)
 
         # Then send individual player results
         for rank, player in enumerate(ranked_players):
-            socketio.emit('player_results',
-                          {
-                              'rank': rank + 1,
-                              'total': player_count,
-                              'distance': player.get_result(game.turn_number).distance,
-                              'score': player.get_result(game.turn_number).score,
-                              'lat': player.get_answer(game.turn_number).latitude,
-                              'lng': player.get_answer(game.turn_number).longitude
-                          },
-                          room=player.sid)
+            for r in [player.sid, "admin"]:
+                socketio.emit('player_results',
+                            {
+                                'rank': rank + 1,
+                                'total': player_count,
+                                'distance': player.get_result(game.turn_number).distance,
+                                'score': player.get_result(game.turn_number).score,
+                                'lat': player.get_answer(game.turn_number).latitude,
+                                'lng': player.get_answer(game.turn_number).longitude
+                            },
+                          room=r)
+                    
 
     @classmethod
     def update_leaderboard(cls, game):

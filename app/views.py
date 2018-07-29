@@ -58,13 +58,27 @@ def join_game(game_id, player_name):
     # Add the player to the game
     game.add_player(request.sid, player_name)
 
+@socketio.on('start_turn')
+def end_turn(game_id):
+    game = game_master.get_game(game_id)
+    game_master.start_turn(game)
+
+@socketio.on('end_turn')
+def start_next_turn(game_id):
+    game = game_master.get_game(game_id)
+    game_master.end_turn(game)
+    
+
+@app.route('/admin')
+def admin():
+    return render_template('admin.html',games=game_master.games,
+                                        MAX_RESPONSE_TIME=MAX_RESPONSE_TIME) 
 
 @socketio.on('disconnect')
 def leave_games():
     for game in game_master.games:
         # Remove the player from the game
         game.remove_player(request.sid)
-
 
 @socketio.on('answer')
 def store_answer(game_id, latitude, longitude):

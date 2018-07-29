@@ -64,10 +64,10 @@ function createMap() {
             })
         ],
         zoomControl: zoomLevel != 0,
-        zoom: 2,
-        maxZoom: 2 + zoomLevel,
-        minZoom: 2,
-        center: [49, 2.5],
+        zoom: 4,
+        maxZoom: 4 + zoomLevel,
+        minZoom: 4,
+        center: [51.4380436,13.390182],
         // Force the user to stay between the given bounds
         maxBounds: [
             [-70.0, -180.0],
@@ -75,6 +75,7 @@ function createMap() {
         ]
 
     });
+    map.setView([51.4380436,13.390182], 4);
 
     map.doubleClickZoom.disable();
 
@@ -214,7 +215,7 @@ function handleNewTurn(data) {
     markerGroup.clearLayers();
 
     // Update game rules to show the city to find
-    $('#game_rules').html('Locate <span class="city">' + data.city + '</span> (' + data.country + ')');
+    $('#game_rules').html(data.question);
 
     // Show countdown timer
     progressBar.animate(1);

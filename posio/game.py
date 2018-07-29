@@ -29,7 +29,7 @@ class Game:
         self.leaderboard_answer_count = leaderboard_answer_count
         self.max_response_time = max_response_time
         self.between_turns_duration = between_turns_duration
-        self.cities = self.get_cities()
+        self.questions = self.get_questions()
         self.players = []
         self.answers = []
         self.turn_number = 0
@@ -51,9 +51,12 @@ class Game:
         # Update turn number
         self.turn_number += 1
 
-    def get_current_city(self):
+    def get_current_question(self):
         # Return a different city for each turn
-        return self.cities[self.turn_number % len(self.cities)]
+        try:
+            return self.questions[self.turn_number]
+        except IndexError:
+            return None
 
     def store_answer(self, player_sid, latitude, longitude):
         # Get the player corresponding to the given sid
@@ -65,14 +68,14 @@ class Game:
             player.add_answer(self.turn_number, answer)
 
     def end_current_turn(self):
-        current_city = self.get_current_city()
+        current_question = self.get_current_question()
 
         # Compute scores for each players once the turn is ended instead of recomputing the score each time a user
         # changes his answer
         for player in [player for player in self.players if player.has_answered(self.turn_number)]:
             # Get the distance between player answer and correct answer
             player_answer = player.get_answer(self.turn_number)
-            distance = self.plane_distance(current_city['latitude'], current_city['longitude'],
+            distance = self.plane_distance(current_question['latitude'], current_question['longitude'],
                                            player_answer.latitude, player_answer.longitude)
 
             # Compute player score for this answer
@@ -120,19 +123,18 @@ class Game:
             return None
 
     @staticmethod
-    def get_cities():
+    def get_questions():
         # Connect to the city database
-        conn = sqlite3.connect(os.path.join(DIR_PATH, '../data/cities.db'))
+        conn = sqlite3.connect(os.path.join(DIR_PATH, '../data/questions.db'))
 
         # Select every cities in random order
         c = conn.cursor()
 
-        cities = []
-        for name, country, latitude, longitude in c.execute(
-                'SELECT name, country, latitude, longitude FROM cities ORDER BY RANDOM()'):
-            cities.append({
-                'name': name,
-                'country': country,
+        questions = []
+        for question, latitude, longitude in c.execute(
+                'SELECT question, latitude, longitude FROM questions ORDER BY RANDOM()'):
+            questions.append({
+                'question': question,
                 'latitude': latitude,
                 'longitude': longitude
             })
@@ -140,7 +142,7 @@ class Game:
         # Close connection
         conn.close()
 
-        return cities
+        return questions
 
     @staticmethod
     def plane_distance(latitude1, longitude1, latitude2, longitude2):
